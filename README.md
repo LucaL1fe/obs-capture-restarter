@@ -81,8 +81,9 @@ and your capture is live again.
 ## Troubleshooting
 
 - **Capture comes back black after wake:** the display-ready gate should
-  prevent this, but if it ever happens, raise `SETTLE_SECONDS` at the top of
-  the script (e.g. to 5) and reload the script.
+  prevent this, but if it ever happens, raise **"Settle time after display
+  wakes"** in the script's settings (Tools → Scripts → select the script),
+  e.g. to 5.
 - **Nothing in the Script Log after wake:** OBS never flagged the capture as
   failed. This is rare but real — with *virtual displays* (DisplayLink,
   BetterDisplay, Sidecar), ScreenCaptureKit can silently capture the wrong

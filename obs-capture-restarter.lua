@@ -36,9 +36,10 @@ local hooked = {}         -- source name -> true, to avoid double connections
 -- brings displays back 1-4 s AFTER processes resume, so instead of guessing
 -- with a fixed timer we ask CoreGraphics (via LuaJIT FFI) whether the main
 -- display is actually awake and active, and additionally require it to stay
--- that way for SETTLE_SECONDS consecutive ticks before pressing the button.
--- (Raise this if a restarted capture ever comes back black after wake.)
-local SETTLE_SECONDS = 2
+-- that way for `settle_seconds` consecutive ticks before pressing the button.
+-- Adjustable in the script's settings UI; raise it if a restarted capture
+-- ever comes back black after wake.
+local settle_seconds = 2
 local ready_streak = 0
 
 local display_ready -- forward declaration
@@ -131,14 +132,14 @@ local function tick()
     if not has_pending then return end
 
     -- Gate on real display state: only act once the display has been awake
-    -- and active for SETTLE_SECONDS consecutive ticks.
+    -- and active for `settle_seconds` consecutive ticks.
     if display_ready() then
         ready_streak = ready_streak + 1
     else
         ready_streak = 0
         return
     end
-    if ready_streak < SETTLE_SECONDS then return end
+    if ready_streak < settle_seconds then return end
 
     local names = pending
     pending = {}
@@ -158,6 +159,26 @@ function script_description()
     return "Automatically restarts frozen macOS screen/audio captures when " ..
            "OBS marks them as failed (wake from sleep, display changes, ...). " ..
            "Event-driven: no polling, no periodic stutter in recordings."
+end
+
+function script_properties()
+    local props = obs.obs_properties_create()
+    local p = obs.obs_properties_add_int(props, "settle_seconds",
+                                         "Settle time after display wakes (seconds)", 1, 30, 1)
+    obs.obs_property_set_long_description(p,
+        "After a capture fails, the restart waits until macOS reports the " ..
+        "display awake AND active, then this many extra seconds. Raise it " ..
+        "only if a restarted capture ever comes back black after wake.")
+    return props
+end
+
+function script_defaults(settings)
+    obs.obs_data_set_default_int(settings, "settle_seconds", 2)
+end
+
+function script_update(settings)
+    settle_seconds = obs.obs_data_get_int(settings, "settle_seconds")
+    if settle_seconds < 1 then settle_seconds = 2 end
 end
 
 function script_load(_settings)
