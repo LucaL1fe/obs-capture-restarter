@@ -109,6 +109,18 @@ local function on_source_create(cd)
     if source ~= nil then hook_source(source) end
 end
 
+-- Forget destroyed sources, or a recreated source with the same name (e.g.
+-- after a scene collection switch) would be skipped as "already hooked"
+-- while its actual signal connection died with the old source.
+local function on_source_destroy(cd)
+    local source = obs.calldata_source(cd, "source")
+    if source ~= nil then
+        local name = obs.obs_source_get_name(source)
+        hooked[name] = nil
+        pending[name] = nil
+    end
+end
+
 -- Cheap 1 s heartbeat: a table lookup while healthy, real work only when
 -- a failure was signalled (and once at startup for already-failed sources).
 local initial_check_done = false
@@ -183,6 +195,7 @@ end
 
 function script_load(_settings)
     obs.signal_handler_connect(obs.obs_get_signal_handler(), "source_create", on_source_create)
+    obs.signal_handler_connect(obs.obs_get_signal_handler(), "source_destroy", on_source_destroy)
     -- Delay the initial scan one tick so sources exist when OBS loads us early.
     obs.timer_add(tick, 1000)
     log("Capture restarter active (event-driven, no polling)")
@@ -191,6 +204,7 @@ end
 function script_unload()
     obs.timer_remove(tick)
     obs.signal_handler_disconnect(obs.obs_get_signal_handler(), "source_create", on_source_create)
+    obs.signal_handler_disconnect(obs.obs_get_signal_handler(), "source_destroy", on_source_destroy)
     for name in pairs(hooked) do
         local source = obs.obs_get_source_by_name(name)
         if source ~= nil then
